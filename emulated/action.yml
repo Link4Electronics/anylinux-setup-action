@@ -1,0 +1,30 @@
+---
+name: "AnyLinux Tools Setup (Arch, emulated)"
+description: "Builds an AppImage in a foreign arch Arch container under qemu user emulation"
+inputs:
+  platform:
+    description: "docker platform to build for (linux/riscv64, linux/loong64, linux/ppc64le or linux/ppc64)"
+    required: true
+  container:
+    description: "container image to run the build in"
+    default: "ghcr.io/pkgforge-dev/archlinux:latest"
+runs:
+  using: "composite"
+  steps:
+    - name: Register QEMU binfmt handlers
+      shell: sh
+      run: "$GITHUB_ACTION_PATH/register-binfmt.sh"
+    - name: Build AppImage
+      shell: sh
+      env:
+        PLATFORM: ${{ inputs.platform }}
+        CONTAINER: ${{ inputs.container }}
+      run: |
+        set -eu
+        # setup.sh sits at the root of this action's own repository, which the
+        # runner has already checked out one level above GITHUB_ACTION_PATH
+        SETUP_DIR=$(dirname "$GITHUB_ACTION_PATH")
+        # sourcing keeps presets like VERSION alive between the two scripts
+        docker run --rm --platform "$PLATFORM" -e GITHUB_REPOSITORY -e DEVEL_RELEASE \
+          -v "$GITHUB_WORKSPACE":/repo -v "$SETUP_DIR":/setup -w /repo "$CONTAINER" \
+          /bin/sh -euc 'sh /setup/setup.sh && . ./get-dependencies.sh && cd /repo && . ./make-appimage.sh'
