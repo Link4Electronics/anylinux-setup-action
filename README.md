@@ -10,14 +10,37 @@ installs the packaging dependencies and deploys `quick-sharun`,
   uses: pkgforge-dev/anylinux-setup-action@main
 ```
 
-The setup script (`setup.sh`) is plain POSIX sh, so foreign arch jobs that
-cannot use a job level container (the binfmt handlers must be registered
-before such a container can start) can run the same logic inside their own
-`docker run`:
+Foreign arch jobs that cannot use a job level container (the binfmt handlers
+must be registered before such a container can start) can use the companion
+emulated action instead, which registers the QEMU handlers and runs the setup
+inside a `docker run`:
 
-```sh
-wget -qO /tmp/setup.sh https://raw.githubusercontent.com/pkgforge-dev/anylinux-setup-action/refs/heads/main/setup.sh
-sh /tmp/setup.sh
+```yaml
+- name: Preparing Container (emulated)
+  uses: pkgforge-dev/anylinux-setup-action/emulated@main
+  with:
+    # one of: linux/riscv64, linux/loong64, linux/ppc64le, linux/ppc64
+    platform: linux/riscv64
+```
+
+Or cover every arch at once with a matrix:
+
+```yaml
+strategy:
+  fail-fast: false
+  matrix:
+    include:
+      # comment out arches you do not want to build
+      - { name: Build AppImage, arch: riscv64, platform: linux/riscv64 }
+      - { name: Build AppImage, arch: loongarch64, platform: linux/loong64 }
+      - { name: Build AppImage, arch: ppc64le, platform: linux/ppc64le }
+      - { name: Build AppImage, arch: ppc64, platform: linux/ppc64 } # BE
+steps:
+  - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+  - name: Build AppImage (emulated)
+    uses: pkgforge-dev/anylinux-setup-action/emulated@8c222ccc48a2134debbcdfd468e419f187f28dcf
+    with:
+      platform: ${{ matrix.platform }}
 ```
 
 Environment overrides: `ANYLINUX_TOOLS_DIR`, `QUICK_SHARUN`,
