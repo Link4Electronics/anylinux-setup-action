@@ -20,7 +20,22 @@ pacman_retry() {
 
 _get_anylinux_tool() {
 	echo "DOWNLOADING '$2' to '$1'"
-	wget --retry-connrefused --tries=30 -O "$@"
+
+	_count=0
+	while [ "$_count" -lt 3 ]; do
+		if wget --retry-connrefused --tries=3 -O "$@"; then
+			return 0
+		else
+			_status=$?
+			>&2 echo "'wget $*' exited with $_status"
+			>&2 echo "Trying again..."
+		fi
+		_count=$((_count + 1))
+		sleep 10
+	done
+
+	>&2 echo "ERROR: Failed to download 3 times!"
+	return 1
 }
 
 echo "Installing basic packaging dependencies..."
@@ -30,11 +45,11 @@ pacman-key --init
 
 # archlinux-keyring is not packaged on the powerpc port, its keys ship in the image
 case "$ARCH" in
-	ppc64|ppc64le) : ;;
-	*) pacman_retry -Syy --noconfirm archlinux-keyring ;;
+	ppc64|ppc64le) :;;
+	*) pacman_retry -Syy --noconfirm archlinux-keyring;;
 esac
 
-pacman_retry -Syu --noconfirm \
+pacman_retry -Syu --needed --noconfirm \
 	7zip \
 	base-devel \
 	freetype2 \
@@ -65,6 +80,12 @@ _get_anylinux_tool "$ANYLINUX_TOOLS_DIR"/get-debloated-pkgs "$DEBLOATED_PACKAGES
 _get_anylinux_tool "$ANYLINUX_TOOLS_DIR"/make-aur-package "$MAKE_AUR_PACKAGE"
 
 chmod +x \
+	"$ANYLINUX_TOOLS_DIR"/quick-sharun \
+	"$ANYLINUX_TOOLS_DIR"/get-debloated-pkgs \
+	"$ANYLINUX_TOOLS_DIR"/make-aur-package
+
+echo "SHA256SUMS:"
+sha256sum \
 	"$ANYLINUX_TOOLS_DIR"/quick-sharun \
 	"$ANYLINUX_TOOLS_DIR"/get-debloated-pkgs \
 	"$ANYLINUX_TOOLS_DIR"/make-aur-package
